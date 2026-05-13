@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Output
+notes/
+output.json
+*.mp4
+*.mp3
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Whisper model cache
+.cache/
