@@ -183,7 +183,7 @@ def transcribe_local(audio_path: str) -> str:
             "未安装 faster-whisper，请运行: pip install faster-whisper"
         )
 
-    model_size = os.environ.get("WHISPER_MODEL", "large-v3")
+    model_size = os.environ.get("WHISPER_MODEL", "small")
     device = os.environ.get("WHISPER_DEVICE", "auto")
     compute_type = os.environ.get("WHISPER_COMPUTE", "int8")
 

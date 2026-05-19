@@ -89,7 +89,7 @@ python douyin_notes.py "$ARGUMENTS" -o output.json
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `WHISPER_MODE` | `local` | `local` 用本地模型，`api` 用 OpenAI Whisper API |
-| `WHISPER_MODEL` | `large-v3` | 本地模型大小：tiny / base / small / medium / large-v3 |
+| `WHISPER_MODEL` | `small` | 本地模型大小：tiny / base / small / medium / large-v3 |
 | `HF_ENDPOINT` | 自动设为 `hf-mirror.com` | Hugging Face 镜像地址（国内环境自动设置） |
 | `OPENAI_API_KEY` | - | API 模式下的 OpenAI 密钥 |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | API 模式下的 base URL（可改为兼容接口） |
