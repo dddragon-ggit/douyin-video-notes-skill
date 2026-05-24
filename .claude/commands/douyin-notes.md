@@ -46,6 +46,8 @@ python douyin_notes.py "$ARGUMENTS" -o output.json
 - **B站/其他**：使用 yt-dlp 下载
 - 国内环境自动使用 hf-mirror.com 镜像下载 Whisper 模型
 
+输出的 JSON 包含以下字段：title、author、description、duration、video_id、url、platform、transcript、**generated_at**（脚本自动生成的当前日期时间）。
+
 如果转录失败，检查错误信息：
 - 网络超时：检查是否需要设置代理
 - 模型下载失败：手动设置 `HF_ENDPOINT=https://hf-mirror.com`
@@ -53,15 +55,15 @@ python douyin_notes.py "$ARGUMENTS" -o output.json
 
 ### 第 3 步：读取转录结果并生成笔记
 
-读取 `output.json` 文件，根据转录文本生成结构化笔记。
+**必须先读取 output.json 文件**，然后根据转录文本生成笔记。
 
 笔记格式：
 
 ```markdown
 # {视频标题}
 
-> 作者：{作者}
-> 链接：{原始链接}
+> 作者：{author}
+> 链接：{url}
 
 ## 核心要点
 
@@ -76,16 +78,18 @@ python douyin_notes.py "$ARGUMENTS" -o output.json
 （提取视频中的精彩语句或关键论断）
 
 ---
-*生成时间：{当前日期时间}*
+*生成时间：{generated_at}*
 ```
+
+**日期规则**：笔记中的日期**必须使用 output.json 中的 `generated_at` 字段**，不要自行填写。
 
 ### 第 4 步：保存笔记并清理
 
-将笔记保存到 `notes/` 目录，文件名格式为 `{YYYY-MM-DD}_{视频标题简写}.md`（标题取前 20 个字符，特殊字符替换为下划线）。
-
-删除临时文件 `output.json`。
-
-告知用户笔记文件路径。
+1. 从 output.json 中读取 `generated_at` 字段，提取日期部分（YYYY-MM-DD）作为文件名前缀
+2. 将笔记保存到 `notes/` 目录，文件名格式：`{YYYY-MM-DD}_{视频标题简写}.md`
+   - 标题取前 20 个字符，特殊字符替换为下划线
+3. 删除临时文件 `output.json`
+4. 告知用户笔记文件路径
 
 ## 环境变量说明
 

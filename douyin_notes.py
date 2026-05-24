@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -340,6 +341,7 @@ def main():
         print("正在转录语音...", file=sys.stderr)
         transcript = transcribe(audio_path)
         info["transcript"] = transcript
+        info["generated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print("转录完成!", file=sys.stderr)
 
     # 输出结果
