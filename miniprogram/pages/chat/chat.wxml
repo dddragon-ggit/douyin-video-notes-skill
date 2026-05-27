@@ -1,0 +1,108 @@
+<view class="chat-container">
+    <!-- 消息列表 -->
+    <scroll-view
+        class="message-list"
+        scroll-y
+        scroll-into-view="{{scrollToId}}"
+        scroll-with-animation
+    >
+        <view
+            wx:for="{{messages}}"
+            wx:key="id"
+            id="msg-{{item.id}}"
+            class="message-wrapper {{item.type === 'user' ? 'user-wrapper' : 'bot-wrapper'}}"
+        >
+            <!-- 系统消息 -->
+            <view wx:if="{{item.type === 'system'}}" class="system-msg">
+                <text>{{item.content}}</text>
+            </view>
+
+            <!-- 用户消息 -->
+            <view wx:elif="{{item.type === 'user'}}" class="user-bubble" bindlongpress="copyText" data-text="{{item.content}}">
+                <text user-select>{{item.content}}</text>
+            </view>
+
+            <!-- 机器人消息 -->
+            <view wx:else class="bot-bubble">
+                <!-- 处理中状态 -->
+                <view wx:if="{{item.status === 'processing'}}" class="processing">
+                    <view class="processing-icon">⏳</view>
+                    <text class="processing-text">{{item.content}}</text>
+                    <view class="progress-bar" wx:if="{{item.progress > 0}}">
+                        <view class="progress-fill" style="width: {{item.progress}}%"></view>
+                    </view>
+                </view>
+
+                <!-- 错误状态 -->
+                <view wx:elif="{{item.status === 'error'}}" class="error-msg" bindlongpress="copyText" data-text="{{item.content}}">
+                    <text>❌ {{item.content}}</text>
+                </view>
+
+                <!-- 笔记结果 -->
+                <view wx:elif="{{item.status === 'done'}}" class="note-result">
+                    <view class="note-title" bindlongpress="copyText" data-text="{{item.result.title}}">{{item.result.title}}</view>
+                    <view class="note-meta">
+                        <text>{{item.result.author}}</text>
+                        <text class="dot">·</text>
+                        <text>{{item.result.platform}}</text>
+                    </view>
+
+                    <view class="note-section" bindlongpress="copyText" data-text="{{item.result.keyPointsText}}">
+                        <text class="section-title">📌 核心要点</text>
+                        <view
+                            wx:for="{{item.result.key_points}}"
+                            wx:for-item="point"
+                            wx:for-index="idx"
+                            wx:key="idx"
+                            class="point-item"
+                        >
+                            <text class="point-num">{{idx + 1}}.</text>
+                            <text>{{point}}</text>
+                        </view>
+                    </view>
+
+                    <view class="note-section" bindlongpress="copyText" data-text="{{item.result.quotesText}}">
+                        <text class="section-title">💬 金句</text>
+                        <view
+                            wx:for="{{item.result.quotes}}"
+                            wx:for-item="quote"
+                            wx:key="index"
+                            class="quote-item"
+                        >
+                            <text>"{{quote}}"</text>
+                        </view>
+                    </view>
+
+                    <view class="note-actions">
+                        <button class="action-btn" bindtap="viewDetail" data-id="{{item.id}}">
+                            📄 查看完整笔记
+                        </button>
+                    </view>
+                </view>
+            </view>
+        </view>
+
+        <!-- 底部占位 -->
+        <view class="bottom-spacer" id="bottom"></view>
+    </scroll-view>
+
+    <!-- 输入区域 -->
+    <view class="input-area">
+        <input
+            class="input-box"
+            placeholder="粘贴视频链接..."
+            value="{{inputValue}}"
+            bindinput="onInput"
+            bindconfirm="sendMessage"
+            confirm-type="send"
+            adjust-position="{{true}}"
+        />
+        <button
+            class="send-btn {{inputValue ? 'active' : ''}}"
+            bindtap="sendMessage"
+            disabled="{{!inputValue || isProcessing}}"
+        >
+            发送
+        </button>
+    </view>
+</view>

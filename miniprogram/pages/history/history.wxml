@@ -1,0 +1,82 @@
+<view class="history-container">
+    <view wx:if="{{loading}}" class="loading-state"><text>加载中...</text></view>
+
+    <!-- 未分类笔记 -->
+    <view class="group-card" wx:if="{{uncategorizedNotes.length > 0}}">
+        <view class="group-header" bindtap="toggleGroup" data-name="__uncategorized__">
+            <view class="group-title">
+                <text class="group-icon {{collapsedGroups['__uncategorized__'] ? 'collapsed' : ''}}">▶</text>
+                <text>📋 未分类笔记</text>
+                <text class="group-count">{{uncategorizedNotes.length}}</text>
+            </view>
+        </view>
+        <view class="group-body" wx:if="{{!collapsedGroups['__uncategorized__']}}">
+            <view
+                wx:for="{{uncategorizedNotes}}"
+                wx:key="_id"
+                class="note-item"
+                bindtap="viewDetail"
+                bindlongpress="moveNote"
+                data-id="{{item._id}}"
+            >
+                <view class="note-title">{{item.title}}</view>
+                <view class="note-info">
+                    <text class="note-platform">{{item.platform}}</text>
+                    <text class="note-date">{{item.generated_at}}</text>
+                </view>
+            </view>
+        </view>
+    </view>
+
+    <!-- 空状态 -->
+    <view wx:if="{{!loading && uncategorizedNotes.length === 0 && categories.length === 0}}" class="empty-state">
+        <view class="empty-icon">📝</view>
+        <text class="empty-text">还没有生成过笔记</text>
+        <text class="empty-hint">在对话页面发送视频链接即可生成</text>
+    </view>
+
+    <!-- 分类分组 -->
+    <view class="group-card" wx:for="{{categories}}" wx:key="_id" wx:for-item="cat">
+        <view class="group-header" bindtap="toggleGroup" data-name="{{cat.name}}">
+            <view class="group-title">
+                <text class="group-icon {{collapsedGroups[cat.name] ? 'collapsed' : ''}}">▶</text>
+                <text>📁 {{cat.name}}</text>
+                <text class="group-count">{{categoryNotes[cat.name].length || 0}}</text>
+            </view>
+            <view class="group-actions" catchtap>
+                <text class="action-icon" bindtap="renameCategory" data-cat="{{cat}}">✏️</text>
+                <text class="action-icon" bindtap="deleteCategory" data-cat="{{cat}}">🗑</text>
+            </view>
+        </view>
+        <view class="group-body" wx:if="{{!collapsedGroups[cat.name]}}">
+            <view
+                wx:for="{{categoryNotes[cat.name]}}"
+                wx:key="_id"
+                wx:for-item="note"
+                class="note-item"
+                bindtap="viewDetail"
+                bindlongpress="moveNote"
+                data-id="{{note._id}}"
+            >
+                <view class="note-title">{{note.title}}</view>
+                <view class="note-info">
+                    <text class="note-platform">{{note.platform}}</text>
+                    <text class="note-date">{{note.generated_at}}</text>
+                </view>
+            </view>
+            <view wx:if="{{categoryNotes[cat.name].length === 0}}" class="empty-category-hint">
+                <text>暂无笔记，长按未分类笔记可移动到此分类</text>
+            </view>
+        </view>
+    </view>
+
+    <!-- 新建分类按钮 -->
+    <view class="add-category-btn" bindtap="createCategory">
+        <text>➕ 新建分类</text>
+    </view>
+
+    <!-- 长按提示 -->
+    <view class="hint-text">
+        <text>长按笔记可移动到分类</text>
+    </view>
+</view>

@@ -28,3 +28,8 @@ Thumbs.db
 
 # Whisper model cache
 .cache/
+
+# WeChat cloud function config (contains secrets)
+cloudfunctions/**/config.json
+miniprogram/config/secrets.js
+project.private.config.json

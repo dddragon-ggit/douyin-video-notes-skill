@@ -1,0 +1,124 @@
+.detail-container {
+    padding: 20rpx;
+    min-height: 100vh;
+    background: #f5f5f5;
+}
+
+.loading-state {
+    text-align: center;
+    padding: 100rpx;
+    font-size: 28rpx;
+    color: #999;
+}
+
+.note-content {
+    background: #fff;
+    border-radius: 16rpx;
+    padding: 32rpx;
+    margin-bottom: 24rpx;
+}
+
+.note-header {
+    margin-bottom: 32rpx;
+    padding-bottom: 24rpx;
+    border-bottom: 1rpx solid #eee;
+}
+
+.note-title {
+    font-size: 36rpx;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 16rpx;
+    line-height: 1.4;
+}
+
+.note-meta {
+    font-size: 24rpx;
+    color: #999;
+}
+
+.dot {
+    margin: 0 8rpx;
+}
+
+.category-row {
+    display: flex;
+    align-items: center;
+    padding: 16rpx 0;
+    border-bottom: 1rpx solid #eee;
+    margin-bottom: 24rpx;
+}
+.cat-label { font-size: 26rpx; color: #999; margin-right: 12rpx; }
+.cat-input {
+    flex: 1;
+    font-size: 26rpx;
+    background: #f8f8f8;
+    padding: 8rpx 16rpx;
+    border-radius: 8rpx;
+    height: 48rpx;
+}
+
+.markdown-body {
+    font-size: 28rpx;
+    line-height: 1.8;
+    color: #333;
+}
+
+.markdown-body h2 {
+    font-size: 32rpx;
+    font-weight: bold;
+    margin: 32rpx 0 16rpx;
+    padding-bottom: 8rpx;
+    border-bottom: 2rpx solid #eee;
+}
+
+.markdown-body h3 {
+    font-size: 30rpx;
+    font-weight: bold;
+    margin: 24rpx 0 12rpx;
+}
+
+.markdown-body p {
+    margin-bottom: 16rpx;
+}
+
+.markdown-body blockquote {
+    border-left: 6rpx solid #07c160;
+    padding-left: 20rpx;
+    color: #666;
+    margin: 16rpx 0;
+    font-style: italic;
+}
+
+.markdown-body li {
+    margin-bottom: 8rpx;
+    padding-left: 12rpx;
+}
+
+.markdown-body strong {
+    font-weight: bold;
+    color: #333;
+}
+
+.action-bar {
+    display: flex;
+    gap: 16rpx;
+    margin-top: 32rpx;
+    padding-top: 24rpx;
+    border-top: 1rpx solid #eee;
+}
+
+.action-btn {
+    flex: 1;
+    font-size: 26rpx;
+    padding: 16rpx 0;
+    background: #f0f9f4;
+    color: #07c160;
+    border: 2rpx solid #07c160;
+    border-radius: 12rpx;
+    line-height: 1.5;
+}
+
+.action-btn::after {
+    border: none;
+}

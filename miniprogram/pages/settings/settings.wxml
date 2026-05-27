@@ -1,0 +1,73 @@
+<view class="settings-container">
+    <!-- LLM API 配置 -->
+    <view class="section">
+        <view class="section-title">LLM API 配置</view>
+
+        <view class="form-item">
+            <text class="form-label">API 格式</text>
+            <radio-group class="radio-group" bindchange="onFormatChange">
+                <label class="radio-item">
+                    <radio value="openai" checked="{{format === 'openai'}}" color="#07c160"/>
+                    <text>OpenAI 兼容</text>
+                </label>
+                <label class="radio-item">
+                    <radio value="anthropic" checked="{{format === 'anthropic'}}" color="#07c160"/>
+                    <text>Anthropic</text>
+                </label>
+            </radio-group>
+        </view>
+
+        <view class="form-item">
+            <text class="form-label">Base URL</text>
+            <input class="form-input" placeholder="https://api.openai.com/v1" value="{{baseUrl}}" bindinput="onBaseUrlInput"/>
+        </view>
+
+        <view class="form-item">
+            <text class="form-label">API Key</text>
+            <view class="password-row">
+                <input class="form-input flex-1" placeholder="sk-..." password="{{!editingKey}}" value="{{apiKey}}" bindinput="onApiKeyInput"/>
+                <text class="toggle-btn" bindtap="toggleKey">{{editingKey ? '隐藏' : '显示'}}</text>
+            </view>
+        </view>
+
+        <view class="form-item">
+            <text class="form-label">模型</text>
+            <input class="form-input" placeholder="gpt-4o / claude-sonnet-4-6" value="{{model}}" bindinput="onModelInput"/>
+        </view>
+    </view>
+
+    <!-- 腾讯云配置 -->
+    <view class="section">
+        <view class="section-title">腾讯云 ASR 配置</view>
+
+        <view class="form-item">
+            <text class="form-label">SecretId</text>
+            <input class="form-input" placeholder="AKID..." value="{{tencentId}}" bindinput="onTencentIdInput"/>
+        </view>
+
+        <view class="form-item">
+            <text class="form-label">SecretKey</text>
+            <view class="password-row">
+                <input class="form-input flex-1" placeholder="..." password="{{!editingTencentKey}}" value="{{tencentKey}}" bindinput="onTencentKeyInput"/>
+                <text class="toggle-btn" bindtap="toggleTencentKey">{{editingTencentKey ? '隐藏' : '显示'}}</text>
+            </view>
+        </view>
+    </view>
+
+    <!-- 操作按钮 -->
+    <view class="button-group">
+        <button class="save-btn" bindtap="saveConfig">保存配置</button>
+        <button class="clear-btn" bindtap="clearConfig">清除配置</button>
+    </view>
+
+    <!-- 格式说明 -->
+    <view class="info-section">
+        <text class="info-title">格式说明</text>
+        <text class="info-text">OpenAI 兼容：POST {base}/chat/completions
+Body: {"model":"xxx","messages":[...]}
+Header: Authorization: Bearer {key}</text>
+        <text class="info-text">Anthropic：POST {base}/messages
+Body: {"model":"xxx","messages":[...]}
+Header: x-api-key: {key}</text>
+    </view>
+</view>

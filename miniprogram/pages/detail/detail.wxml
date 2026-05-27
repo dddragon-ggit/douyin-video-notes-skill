@@ -1,0 +1,33 @@
+<view class="detail-container">
+    <view wx:if="{{loading}}" class="loading-state">
+        <text>加载中...</text>
+    </view>
+
+    <view wx:if="{{note && !loading}}" class="note-content">
+        <view class="note-header">
+            <view class="note-title">{{note.title}}</view>
+            <view class="note-meta">
+                <text>{{note.author}}</text>
+                <text class="dot">·</text>
+                <text>{{note.platform}}</text>
+                <text class="dot">·</text>
+                <text>{{note.generated_at}}</text>
+            </view>
+        </view>
+
+        <!-- 分类编辑 -->
+        <view class="category-row">
+            <text class="cat-label">分类</text>
+            <input class="cat-input" placeholder="输入分类" value="{{category}}" bindinput="onCategoryInput" bindblur="saveCategory"/>
+        </view>
+
+        <view class="markdown-body">
+            <rich-text nodes="{{htmlContent}}"></rich-text>
+        </view>
+
+        <view class="action-bar">
+            <button class="action-btn" bindtap="copyContent">📋 复制全文</button>
+            <button class="action-btn" open-type="share">🔗 分享</button>
+        </view>
+    </view>
+</view>
