@@ -7,7 +7,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 
 // ── 配置 ──────────────────────────────────────────────
-const ALLOWED_OPENID = "o6zAJs6HQyrMgN-KGSnK4rsyKGOA";
+const ALLOWED_OPENID = "oaEY53W1Ytbv2opj7HfTaqedXYeg";
 const TENCENT_SECRET_ID = process.env.TENCENT_SECRET_ID || "";
 const TENCENT_SECRET_KEY = process.env.TENCENT_SECRET_KEY || "";
 const BASE_URL = process.env.BASE_URL || "";
@@ -113,7 +113,9 @@ exports.main = async (event) => {
   const { action } = event;
 
   // ── 访问控制：仅允许指定用户 ─────────────────────────
-  const openid = event.userInfo?.openId || "";
+  const wxContext = cloud.getWXContext();
+  const openid = wxContext.OPENID || event.userInfo?.openId || "";
+  console.log("调用者 openid:", openid, "action:", action);
   if (openid !== ALLOWED_OPENID) {
     console.log("未授权访问, openid:", openid);
     return { success: false, error: "未授权用户，无法使用此服务" };
@@ -141,6 +143,14 @@ exports.main = async (event) => {
         return await clearCategoryNotes(event.oldCategory);
       case "renameCategoryNotes":
         return await renameCategoryNotes(event.oldName, event.newName);
+      case "updateNoteStar":
+        return await updateNoteStar(event.noteId, event.starred);
+      case "deleteNote":
+        return await deleteNote(event.noteId);
+      case "updateNoteMemo":
+        return await updateNoteMemo(event.noteId, event.memo);
+      case "deleteCloudFile":
+        return await deleteCloudFile(event.fileID);
       default:
         return { success: false, error: "未知 action: " + action };
     }
@@ -483,7 +493,7 @@ async function generateAndSave(transcript, info, url, apiConfig) {
 }
 
 // ── 第 5b 步：保存笔记到数据库 ────────────────────────
-async function saveNoteOnly(info, noteContent, url, category) {
+async function saveNoteOnly(info, noteContent, url, category, memo) {
   if (!noteContent) return { success: false, error: "缺少笔记内容" };
   if (!info || !info.title) return { success: false, error: "缺少视频信息" };
 
@@ -492,6 +502,12 @@ async function saveNoteOnly(info, noteContent, url, category) {
     const pad = (n) => String(n).padStart(2, "0");
     const generatedAt = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 
+    // 在笔记内容前拼接链接和便签
+    let prefix = "";
+    if (url) prefix += "🔗 [视频链接](" + url + ")\n\n";
+    if (memo) prefix += "📝 " + memo + "\n\n";
+    const fullMarkdown = prefix + noteContent;
+
     const dbRes = await db.collection("notes").add({
       data: {
         title: info.title,
@@ -499,8 +515,10 @@ async function saveNoteOnly(info, noteContent, url, category) {
         platform: info.platform || "其他",
         duration: info.duration || 0,
         url: url || "",
-        detail_markdown: noteContent,
+        detail_markdown: fullMarkdown,
         category: category || "",
+        starred: false,
+        memo: memo || "",
         created_at: db.serverDate(),
         generated_at: generatedAt,
       },
@@ -553,6 +571,74 @@ async function renameCategoryNotes(oldName, newName) {
     console.error("重命名分类笔记失败:", e.message);
     return { success: false, error: "操作失败: " + e.message };
   }
+}
+
+async function deleteCloudFile(fileID) {
+  if (!fileID) return { success: false, error: "缺少 fileID" };
+  try {
+    await cloud.deleteFile({ fileList: [fileID] });
+    console.log("已删除云存储文件:", fileID);
+    return { success: true };
+  } catch (e) {
+    console.error("删除云存储文件失败:", e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+async function updateNoteStar(noteId, starred) {
+  if (!noteId) return { success: false, error: "缺少笔记 ID" };
+  try {
+    await db.collection("notes").doc(noteId).update({ data: { starred: !!starred } });
+    return { success: true };
+  } catch (e) {
+    console.error("更新星标失败:", e.message);
+    return { success: false, error: "操作失败: " + e.message };
+  }
+}
+
+async function deleteNote(noteId) {
+  if (!noteId) return { success: false, error: "缺少笔记 ID" };
+  try {
+    await db.collection("notes").doc(noteId).remove();
+    return { success: true };
+  } catch (e) {
+    console.error("删除笔记失败:", e.message);
+    return { success: false, error: "删除失败: " + e.message };
+  }
+}
+
+async function updateNoteMemo(noteId, memo) {
+  if (!noteId) return { success: false, error: "缺少笔记 ID" };
+  try {
+    const res = await db.collection("notes").doc(noteId).get();
+    const note = res.data;
+    if (!note) return { success: false, error: "笔记不存在" };
+
+    // 重新拼接 detail_markdown 前缀：链接 + 便签 + 原始笔记内容
+    const rawContent = stripPrefix(note.detail_markdown || "");
+    let prefix = "";
+    if (note.url) prefix += "🔗 [视频链接](" + note.url + ")\n\n";
+    if (memo) prefix += "📝 " + memo + "\n\n";
+    const fullMarkdown = prefix + rawContent;
+
+    await db.collection("notes").doc(noteId).update({
+      data: { memo: memo || "", detail_markdown: fullMarkdown },
+    });
+    return { success: true };
+  } catch (e) {
+    console.error("更新便签失败:", e.message);
+    return { success: false, error: "操作失败: " + e.message };
+  }
+}
+
+// 从 detail_markdown 中剥离 🔗 链接行和 📝 便签行，返回原始笔记内容
+function stripPrefix(md) {
+  let content = md;
+  // 剥离开头的 🔗 链接行
+  content = content.replace(/^🔗\s*\[视频链接\]\(https?:\/\/[^\)]+\)\n*/g, "");
+  // 剥离开头的 📝 便签行（可能多行）
+  content = content.replace(/^📝\s*.+\n*/gm, "");
+  return content.trimStart();
 }
 
 async function generateNotes(transcript, info, apiConfig) {

@@ -5,7 +5,10 @@
 
     <view wx:if="{{note && !loading}}" class="note-content">
         <view class="note-header">
-            <view class="note-title">{{note.title}}</view>
+            <view class="title-row">
+                <view class="note-title">{{note.title}}</view>
+                <text class="star-btn {{starred ? 'starred' : ''}}" bindtap="toggleStar">{{starred ? '★' : '☆'}}</text>
+            </view>
             <view class="note-meta">
                 <text>{{note.author}}</text>
                 <text class="dot">·</text>
@@ -13,6 +16,18 @@
                 <text class="dot">·</text>
                 <text>{{note.generated_at}}</text>
             </view>
+        </view>
+
+        <!-- 视频链接 -->
+        <view class="link-row" wx:if="{{videoUrl}}" bindtap="copyLink">
+            <text class="link-icon">🔗</text>
+            <text class="link-text">视频链接（点击复制）</text>
+        </view>
+
+        <!-- 便签 -->
+        <view class="memo-section">
+            <text class="memo-label">📝 便签</text>
+            <textarea class="memo-input" placeholder="添加你的笔记或备注..." value="{{memo}}" bindinput="onMemoInput" bindblur="saveMemo" auto-height maxlength="500"/>
         </view>
 
         <!-- 分类编辑 -->
@@ -28,6 +43,11 @@
         <view class="action-bar">
             <button class="action-btn" bindtap="copyContent">📋 复制全文</button>
             <button class="action-btn" open-type="share">🔗 分享</button>
+        </view>
+
+        <view class="danger-bar">
+            <button class="regen-btn" bindtap="regenerate">🔄 重新生成笔记</button>
+            <button class="delete-btn" bindtap="deleteNote">🗑 删除笔记</button>
         </view>
     </view>
 </view>

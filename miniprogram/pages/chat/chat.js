@@ -24,11 +24,17 @@ Page({
         scrollToId: '',
     },
 
-    onLoad() {
+    onLoad(options) {
         this.addMessage({
             type: 'system',
             content: '欢迎使用视频笔记助手！发送抖音或B站链接，我帮你生成结构化笔记。',
         });
+        // 从详情页"重新生成"跳转过来时自动触发
+        if (options.url) {
+            const url = decodeURIComponent(options.url);
+            this.setData({ inputValue: url });
+            setTimeout(() => this.sendMessage(), 300);
+        }
     },
 
     onInput(e) {
@@ -81,6 +87,7 @@ Page({
 
             const info = parseRes.info;
             let publicUrl;
+            let cloudFileID = null;
 
             if (parseRes.needClientDownload) {
                 publicUrl = await this.handleBilibili(parseRes, procId);
@@ -91,6 +98,7 @@ Page({
                 const uploadRes = await this.callCloud('downloadAndUpload', { videoUrl, extraHeaders: parseRes.biliHeaders });
                 if (!uploadRes.success) throw new Error(uploadRes.error);
                 publicUrl = uploadRes.publicUrl;
+                cloudFileID = uploadRes.fileID || null;
             }
 
             if (!publicUrl) throw new Error('未获取到云存储链接');
@@ -103,6 +111,11 @@ Page({
 
             // 第 4 步：轮询 ASR 结果
             const transcript = await this.pollASR(asrTaskId, procId);
+
+            // ASR 完成后清理云存储中的视频文件
+            if (cloudFileID) {
+                this.callCloud('deleteCloudFile', { fileID: cloudFileID }).catch(() => {});
+            }
 
             // 第 5 步：生成笔记
             this.updateMessage(procId, { content: '正在生成笔记...', progress: 80 });

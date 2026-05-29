@@ -13,6 +13,26 @@ function saveCategoriesLocal(list) {
     wx.setStorageSync(CATS_KEY, list);
 }
 
+// 星标优先 + 时间倒序排列
+function sortNotes(notes) {
+    return notes.slice().sort((a, b) => {
+        const sa = a.starred ? 1 : 0;
+        const sb = b.starred ? 1 : 0;
+        if (sa !== sb) return sb - sa;
+        return 0; // 保持原有 created_at 倒序
+    });
+}
+
+// 从 detail_markdown 中提取便签摘要
+function getMemoSummary(note) {
+    if (note.memo) return note.memo.slice(0, 30) + (note.memo.length > 30 ? '...' : '');
+    // 兼容旧数据：从 detail_markdown 提取
+    const md = note.detail_markdown || '';
+    const match = md.match(/^📝\s*(.+)/m);
+    if (match) return match[1].trim().slice(0, 30);
+    return '';
+}
+
 Page({
     data: {
         uncategorizedNotes: [],
@@ -44,19 +64,24 @@ Page({
             const uncategorizedNotes = [];
 
             for (const note of allNotes) {
+                note._memoSummary = getMemoSummary(note);
                 if (note.category && categoryNotes[note.category] !== undefined) {
                     categoryNotes[note.category].push(note);
-                } else if (note.category) {
-                    uncategorizedNotes.push(note);
                 } else {
                     uncategorizedNotes.push(note);
                 }
             }
 
+            // 每组内星标优先排序
+            for (const name of Object.keys(categoryNotes)) {
+                categoryNotes[name] = sortNotes(categoryNotes[name]);
+            }
+            const sortedUncategorized = sortNotes(uncategorizedNotes);
+
             this.setData({
                 categories: cats,
                 categoryNotes,
-                uncategorizedNotes,
+                uncategorizedNotes: sortedUncategorized,
                 loading: false,
             });
         } catch (err) {
@@ -208,5 +233,34 @@ Page({
     viewDetail(e) {
         const id = e.currentTarget.dataset.id;
         wx.navigateTo({ url: "/pages/detail/detail?id=" + id });
+    },
+
+    // 切换星标（阻止冒泡，不触发 viewDetail）
+    toggleStar(e) {
+        const noteId = e.currentTarget.dataset.id;
+        const starred = e.currentTarget.dataset.starred;
+        const newStarred = !starred;
+
+        // 乐观更新 UI
+        this.updateNoteLocal(noteId, { starred: newStarred });
+
+        wx.cloud.callFunction({
+            name: 'processVideo',
+            data: { action: 'updateNoteStar', noteId, starred: newStarred },
+        }).catch(() => {
+            this.updateNoteLocal(noteId, { starred: starred });
+            wx.showToast({ title: "操作失败", icon: "none" });
+        });
+    },
+
+    // 本地更新笔记数据并重新排序
+    updateNoteLocal(noteId, updates) {
+        const updateList = (list) => list.map(n => n._id === noteId ? Object.assign({}, n, updates) : n);
+        const uncategorizedNotes = sortNotes(updateList(this.data.uncategorizedNotes));
+        const categoryNotes = {};
+        for (const [name, notes] of Object.entries(this.data.categoryNotes)) {
+            categoryNotes[name] = sortNotes(updateList(notes));
+        }
+        this.setData({ uncategorizedNotes, categoryNotes });
     },
 });

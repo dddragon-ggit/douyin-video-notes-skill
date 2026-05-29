@@ -79,6 +79,27 @@
     border-bottom: none;
 }
 
+.note-item-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12rpx;
+}
+
+.star-icon {
+    font-size: 36rpx;
+    color: #ddd;
+    line-height: 1.2;
+    padding-top: 2rpx;
+}
+.star-icon.starred {
+    color: #ff9500;
+}
+
+.note-item-body {
+    flex: 1;
+    min-width: 0;
+}
+
 .note-title {
     font-size: 28rpx;
     color: #333;
@@ -86,8 +107,17 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     overflow: hidden;
-    margin-bottom: 8rpx;
+    margin-bottom: 6rpx;
     line-height: 1.4;
+}
+
+.note-memo {
+    font-size: 24rpx;
+    color: #999;
+    margin-bottom: 6rpx;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .note-info {

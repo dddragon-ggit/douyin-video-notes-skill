@@ -19,10 +19,16 @@
                 bindlongpress="moveNote"
                 data-id="{{item._id}}"
             >
-                <view class="note-title">{{item.title}}</view>
-                <view class="note-info">
-                    <text class="note-platform">{{item.platform}}</text>
-                    <text class="note-date">{{item.generated_at}}</text>
+                <view class="note-item-row">
+                    <text class="star-icon {{item.starred ? 'starred' : ''}}" catchtap="toggleStar" data-id="{{item._id}}" data-starred="{{item.starred}}">{{item.starred ? '★' : '☆'}}</text>
+                    <view class="note-item-body">
+                        <view class="note-title">{{item.title}}</view>
+                        <view class="note-memo" wx:if="{{item._memoSummary}}">📝 {{item._memoSummary}}</view>
+                        <view class="note-info">
+                            <text class="note-platform">{{item.platform}}</text>
+                            <text class="note-date">{{item.generated_at}}</text>
+                        </view>
+                    </view>
                 </view>
             </view>
         </view>
@@ -58,10 +64,16 @@
                 bindlongpress="moveNote"
                 data-id="{{note._id}}"
             >
-                <view class="note-title">{{note.title}}</view>
-                <view class="note-info">
-                    <text class="note-platform">{{note.platform}}</text>
-                    <text class="note-date">{{note.generated_at}}</text>
+                <view class="note-item-row">
+                    <text class="star-icon {{note.starred ? 'starred' : ''}}" catchtap="toggleStar" data-id="{{note._id}}" data-starred="{{note.starred}}">{{note.starred ? '★' : '☆'}}</text>
+                    <view class="note-item-body">
+                        <view class="note-title">{{note.title}}</view>
+                        <view class="note-memo" wx:if="{{note._memoSummary}}">📝 {{note._memoSummary}}</view>
+                        <view class="note-info">
+                            <text class="note-platform">{{note.platform}}</text>
+                            <text class="note-date">{{note.generated_at}}</text>
+                        </view>
+                    </view>
                 </view>
             </view>
             <view wx:if="{{categoryNotes[cat.name].length === 0}}" class="empty-category-hint">
