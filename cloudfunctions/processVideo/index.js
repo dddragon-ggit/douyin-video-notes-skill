@@ -151,6 +151,8 @@ exports.main = async (event) => {
         return await updateNoteMemo(event.noteId, event.memo);
       case "deleteCloudFile":
         return await deleteCloudFile(event.fileID);
+      case "generateFromText":
+        return await generateFromText(event.text, event.title, event.apiConfig || {});
       default:
         return { success: false, error: "未知 action: " + action };
     }
@@ -653,28 +655,31 @@ async function generateNotes(transcript, info, apiConfig) {
   if (!cfg.apiKey) throw new Error("未配置 API Key，请在设置中填写");
   if (!cfg.baseUrl) throw new Error("未配置 API 地址，请在设置中填写");
 
-  const prompt = `你是一个专业的视频笔记助手。请根据以下视频转录内容生成结构化笔记。
+  const prompt = `你是一个专业的笔记助手。请根据以下内容生成结构化的详细笔记。
 
-视频标题：${info.title}
-作者：${info.author}
-平台：${info.platform}
+标题：${info.title}
+来源：${info.author}（${info.platform}）
 
-转录内容：
-${transcript.slice(0, 3000)}
+内容：
+${transcript.slice(0, 6000)}
 
 请生成以下格式的笔记（使用 Markdown）：
 
 ## 核心要点
-（列出 3-5 个核心要点，每个要点用一句话概括）
+（列出 3-5 个核心要点，每个要点包含标题和 1-2 句详细说明）
 
 ## 详细笔记
-（按主题分段，每段包含关键信息）
+（这是最重要的部分。按主题分段，每段要深入展开：
+- 涉及具体方法、策略、步骤的内容，要完整列出，不要省略
+- 技术细节要写清楚原理和操作步骤
+- 数据、案例、对比分析要保留并展开说明
+- 如果有操作流程或方法论，用编号列表逐步展开）
 
 ## 金句摘录
-（提取 2-3 句有启发性的原话）
+（提取 3-5 句有启发性或有指导意义的原话）
 
 ## 总结
-（用 2-3 句话总结视频核心观点）`;
+（用 3-5 句话总结核心观点和可执行的行动建议）`;
 
   let res;
   if (cfg.format === "anthropic") {
@@ -684,8 +689,8 @@ ${transcript.slice(0, 3000)}
       `${cfg.baseUrl}/messages`,
       {
         model: cfg.model,
-        max_tokens: 2048,
-        system: "你是一个专业的视频笔记助手，擅长生成结构化笔记。",
+        max_tokens: 4096,
+        system: "你是一个专业的笔记助手，擅长生成详细、深入的结构化笔记。",
         messages: [{ role: "user", content: prompt }],
       },
       {
@@ -707,7 +712,7 @@ ${transcript.slice(0, 3000)}
     {
       model: cfg.model,
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 2048,
+      max_tokens: 4096,
       temperature: 0.7,
     },
     { Authorization: `Bearer ${cfg.apiKey}` }
@@ -724,4 +729,22 @@ ${transcript.slice(0, 3000)}
   if (data.error) throw new Error("LLM 错误: " + (data.error.message || JSON.stringify(data.error)));
   if (!data.choices || !data.choices[0] || !data.choices[0].message) throw new Error("LLM 返回了空结果");
   return data.choices[0].message.content;
+}
+
+// ── 文本笔记生成 ────────────────────────────────────
+async function generateFromText(text, title, apiConfig) {
+  if (!text || typeof text !== "string" || text.trim().length < 10) {
+    return { success: false, error: "请输入至少 10 个字的内容" };
+  }
+
+  const noteTitle = (title && title.trim()) || "文本笔记";
+  const info = { title: noteTitle, author: "用户输入", platform: "文本笔记" };
+
+  try {
+    const noteContent = await generateNotes(text.trim(), info, apiConfig);
+    return { success: true, noteContent };
+  } catch (e) {
+    console.error("文本笔记生成失败:", e.message);
+    return { success: false, error: "笔记生成失败: " + e.message };
+  }
 }

@@ -1,6 +1,7 @@
 {
     "pages": [
         "pages/chat/chat",
+        "pages/textnote/textnote",
         "pages/history/history",
         "pages/detail/detail",
         "pages/settings/settings"
@@ -20,6 +21,12 @@
                 "text": "对话",
                 "iconPath": "images/chat.png",
                 "selectedIconPath": "images/chat-active.png"
+            },
+            {
+                "pagePath": "pages/textnote/textnote",
+                "text": "笔记",
+                "iconPath": "images/note.png",
+                "selectedIconPath": "images/note-active.png"
             },
             {
                 "pagePath": "pages/history/history",

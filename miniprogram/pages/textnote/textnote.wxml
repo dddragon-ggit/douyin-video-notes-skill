@@ -1,0 +1,58 @@
+<view class="container">
+    <!-- 输入区 -->
+    <view class="input-section">
+        <view class="title-row">
+            <input class="title-input" placeholder="笔记标题（可选）" value="{{title}}" bindinput="onTitleInput" maxlength="50"/>
+        </view>
+        <view class="textarea-wrapper">
+            <textarea class="text-input" placeholder="粘贴你要总结的文字...\n\n支持文章、对话记录、会议纪要等任何文本内容" value="{{text}}" bindinput="onTextInput" maxlength="50000" auto-height="false"/>
+            <view class="char-count">{{text.length}} / 50000</view>
+        </view>
+        <view class="input-actions">
+            <button class="btn-paste" bindtap="pasteClipboard">📋 粘贴</button>
+            <button class="btn-clear" bindtap="clearInput" wx:if="{{text.length > 0}}">清空</button>
+        </view>
+    </view>
+
+    <!-- 生成按钮 -->
+    <button class="btn-generate {{generating ? 'disabled' : ''}}" bindtap="generate" disabled="{{generating || text.length < 10}}">
+        {{generating ? '正在生成笔记...' : '📝 生成笔记'}}
+    </button>
+
+    <!-- 加载状态 -->
+    <view class="loading-state" wx:if="{{generating}}">
+        <view class="loading-spinner"></view>
+        <text class="loading-text">AI 正在分析内容并生成笔记，请稍候...</text>
+    </view>
+
+    <!-- 结果预览 -->
+    <view class="result-section" wx:if="{{result && !generating}}">
+        <view class="result-header">
+            <text class="result-title">{{result.title}}</text>
+            <text class="result-platform">{{result.platform}}</text>
+        </view>
+
+        <!-- 核心要点 -->
+        <view class="result-block" wx:if="{{result.key_points.length > 0}}">
+            <text class="block-title">📌 核心要点</text>
+            <view class="point-item" wx:for="{{result.key_points}}" wx:key="title">
+                <text class="point-title">{{item.title}}</text>
+                <text class="point-desc" wx:if="{{item.desc}}">{{item.desc}}</text>
+            </view>
+        </view>
+
+        <!-- 金句摘录 -->
+        <view class="result-block" wx:if="{{result.quotes.length > 0}}">
+            <text class="block-title">💡 金句摘录</text>
+            <view class="quote-item" wx:for="{{result.quotes}}" wx:key="*this">
+                <text class="quote-text">"{{item}}"</text>
+            </view>
+        </view>
+
+        <!-- 操作按钮 -->
+        <view class="result-actions">
+            <button class="btn-view" bindtap="viewDetail" wx:if="{{noteId}}">📄 查看完整笔记</button>
+            <button class="btn-copy" bindtap="copyResult">📋 复制</button>
+        </view>
+    </view>
+</view>
