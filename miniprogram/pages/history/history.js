@@ -1,4 +1,3 @@
-const db = wx.cloud.database();
 const CATS_KEY = "categories_v2";
 
 function loadCategoriesLocal() {
@@ -16,9 +15,14 @@ function saveCategoriesLocal(list) {
 // 星标优先 + 时间倒序排列
 function sortNotes(notes) {
     return notes.slice().sort((a, b) => {
+        // 星标优先
         const sa = a.starred ? 1 : 0;
         const sb = b.starred ? 1 : 0;
         if (sa !== sb) return sb - sa;
+        // 未读优先（read 为 false 或 undefined 的排前面）
+        const ra = a.read ? 1 : 0;
+        const rb = b.read ? 1 : 0;
+        if (ra !== rb) return ra - rb;
         return 0; // 保持原有 created_at 倒序
     });
 }
@@ -55,12 +59,17 @@ Page({
                 categoryNotes[c.name] = [];
             }
 
-            const notesRes = await db.collection("notes")
-                .orderBy("created_at", "desc")
-                .limit(100)
-                .get();
+            const notesRes = await wx.cloud.callFunction({
+                name: 'processVideo',
+                data: { action: 'listNotes' },
+            });
 
-            const allNotes = notesRes.data || [];
+            const result = notesRes.result || {};
+            if (!result.success) {
+                throw new Error(result.error || "加载历史笔记失败");
+            }
+
+            const allNotes = result.notes || [];
             const uncategorizedNotes = [];
 
             for (const note of allNotes) {
@@ -249,6 +258,23 @@ Page({
             data: { action: 'updateNoteStar', noteId, starred: newStarred },
         }).catch(() => {
             this.updateNoteLocal(noteId, { starred: starred });
+            wx.showToast({ title: "操作失败", icon: "none" });
+        });
+    },
+
+    // 切换已读（阻止冒泡，不触发 viewDetail）
+    toggleRead(e) {
+        const noteId = e.currentTarget.dataset.id;
+        const read = e.currentTarget.dataset.read;
+        const newRead = !read;
+
+        this.updateNoteLocal(noteId, { read: newRead });
+
+        wx.cloud.callFunction({
+            name: 'processVideo',
+            data: { action: 'updateNoteRead', noteId, read: newRead },
+        }).catch(() => {
+            this.updateNoteLocal(noteId, { read: read });
             wx.showToast({ title: "操作失败", icon: "none" });
         });
     },

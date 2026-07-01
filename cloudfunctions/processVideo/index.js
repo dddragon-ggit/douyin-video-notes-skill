@@ -13,8 +13,20 @@ const TENCENT_SECRET_KEY = process.env.TENCENT_SECRET_KEY || "";
 const BASE_URL = process.env.BASE_URL || "";
 const API_KEY = process.env.API_KEY || "";
 const MODEL = process.env.MODEL || "";
+const LLM_TIMEOUT_MS = getEnvInt("LLM_TIMEOUT_MS", 55000, 15000, 180000);
+const LLM_TRANSCRIPT_LIMIT = getEnvInt("LLM_TRANSCRIPT_LIMIT", 8000, 2000, 20000);
+const LLM_MAX_TOKENS = getEnvInt("LLM_MAX_TOKENS", 2200, 1024, 6000);
+const LLM_CHUNK_TIMEOUT_MS = getEnvInt("LLM_CHUNK_TIMEOUT_MS", 45000, 15000, 55000);
+const LLM_CHUNK_MAX_TOKENS = getEnvInt("LLM_CHUNK_MAX_TOKENS", 900, 700, 3000);
+const NOTE_LIST_PAGE_SIZE = getEnvInt("NOTE_LIST_PAGE_SIZE", 100, 20, 100);
 
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+
+function getEnvInt(name, fallback, min, max) {
+  const value = Number.parseInt(process.env[name] || "", 10);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(Math.max(value, min), max);
+}
 
 // ── HTTP 工具（带重试） ───────────────────────────────
 function httpGet(url, headers = {}, maxRedirects = 5) {
@@ -54,11 +66,13 @@ function getRedirectUrl(url, maxRedirects = 5) {
   });
 }
 
-function httpsPost(url, body, headers = {}) {
+function httpsPost(url, body, headers = {}, options = {}) {
   return new Promise((resolve, reject) => {
     let u;
     try { u = new URL(url); } catch (e) { return reject(new Error("无效 URL: " + url)); }
     const payload = JSON.stringify(body);
+    const timeoutMs = options.timeoutMs || LLM_TIMEOUT_MS;
+    const startedAt = Date.now();
     const req = https.request(
       {
         hostname: u.hostname,
@@ -66,16 +80,16 @@ function httpsPost(url, body, headers = {}) {
         path: u.pathname + u.search,
         method: "POST",
         headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload), ...headers },
-        timeout: 50000,
+        timeout: timeoutMs,
       },
       (res) => {
         let data = "";
         res.on("data", (chunk) => (data += chunk));
-        res.on("end", () => resolve({ status: res.statusCode, body: data }));
+        res.on("end", () => resolve({ status: res.statusCode, body: data, durationMs: Date.now() - startedAt }));
       }
     );
     req.on("error", (e) => reject(new Error("POST 请求失败: " + e.message)));
-    req.on("timeout", () => { req.destroy(); reject(new Error("POST 请求超时(60s)")); });
+    req.on("timeout", () => { req.destroy(); reject(new Error("POST 请求超时(" + Math.round(timeoutMs / 1000) + "s)")); });
     req.write(payload);
     req.end();
   });
@@ -135,8 +149,12 @@ exports.main = async (event) => {
         return await checkASRResult(event.taskId);
       case "generateAndSave":
         return await generateAndSave(event.transcript, event.info, event.url, event.apiConfig || {});
+      case "generateNoteChunk":
+        return await generateNoteChunkAction(event.transcriptChunk, event.info, event.chunkIndex, event.totalChunks, event.apiConfig || {});
       case "saveNote":
         return await saveNoteOnly(event.info, event.noteContent, event.url, event.category);
+      case "listNotes":
+        return await listNotes();
       case "updateNoteCategory":
         return await updateNoteCategory(event.noteId, event.category);
       case "clearCategoryNotes":
@@ -145,6 +163,8 @@ exports.main = async (event) => {
         return await renameCategoryNotes(event.oldName, event.newName);
       case "updateNoteStar":
         return await updateNoteStar(event.noteId, event.starred);
+      case "updateNoteRead":
+        return await updateNoteRead(event.noteId, event.read);
       case "deleteNote":
         return await deleteNote(event.noteId);
       case "updateNoteMemo":
@@ -533,6 +553,45 @@ async function saveNoteOnly(info, noteContent, url, category, memo) {
   }
 }
 
+// ── 历史笔记列表（云函数端分页，避开小程序端 20 条限制） ─────
+async function listNotes() {
+  try {
+    const countRes = await db.collection("notes").count();
+    const total = countRes.total || 0;
+    const notes = [];
+
+    for (let offset = 0; offset < total; offset += NOTE_LIST_PAGE_SIZE) {
+      const res = await db.collection("notes")
+        .orderBy("created_at", "desc")
+        .skip(offset)
+        .limit(NOTE_LIST_PAGE_SIZE)
+        .field({
+          _id: true,
+          title: true,
+          author: true,
+          platform: true,
+          duration: true,
+          url: true,
+          category: true,
+          starred: true,
+          memo: true,
+          created_at: true,
+          generated_at: true,
+        })
+        .get();
+
+      const pageNotes = res.data || [];
+      notes.push(...pageNotes);
+      if (pageNotes.length < NOTE_LIST_PAGE_SIZE) break;
+    }
+
+    return { success: true, notes, total };
+  } catch (e) {
+    console.error("加载历史笔记失败:", e.message);
+    return { success: false, error: "加载历史笔记失败: " + e.message };
+  }
+}
+
 // ── 分类管理（服务端操作，绕过权限限制） ──────────────
 async function updateNoteCategory(noteId, category) {
   if (!noteId) return { success: false, error: "缺少笔记 ID" };
@@ -598,6 +657,17 @@ async function updateNoteStar(noteId, starred) {
   }
 }
 
+async function updateNoteRead(noteId, read) {
+  if (!noteId) return { success: false, error: "缺少笔记 ID" };
+  try {
+    await db.collection("notes").doc(noteId).update({ data: { read: !!read } });
+    return { success: true };
+  } catch (e) {
+    console.error("更新已读失败:", e.message);
+    return { success: false, error: "操作失败: " + e.message };
+  }
+}
+
 async function deleteNote(noteId) {
   if (!noteId) return { success: false, error: "缺少笔记 ID" };
   try {
@@ -643,62 +713,64 @@ function stripPrefix(md) {
   return content.trimStart();
 }
 
-async function generateNotes(transcript, info, apiConfig) {
+function getLlmConfig(apiConfig) {
   const defaults = {
     baseUrl: BASE_URL,
     apiKey: API_KEY,
     model: MODEL,
     format: "openai",
   };
-  const cfg = Object.assign(defaults, apiConfig || {});
+  const cfg = Object.assign({}, defaults);
+  for (const [key, value] of Object.entries(apiConfig || {})) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string" && !value.trim()) continue;
+    cfg[key] = typeof value === "string" ? value.trim() : value;
+  }
 
   if (!cfg.apiKey) throw new Error("未配置 API Key，请在设置中填写");
   if (!cfg.baseUrl) throw new Error("未配置 API 地址，请在设置中填写");
+  if (!cfg.model) throw new Error("未配置模型名，请在设置中填写");
+  return cfg;
+}
 
-  const prompt = `你是一个专业的笔记助手。请根据以下内容生成结构化的详细笔记。
+async function requestLlmText(prompt, cfg, options = {}) {
+  const maxTokens = options.maxTokens || LLM_MAX_TOKENS;
+  const timeoutMs = options.timeoutMs || LLM_TIMEOUT_MS;
+  const temperature = options.temperature ?? 0.35;
+  let apiHost = "";
+  try { apiHost = new URL(cfg.baseUrl).host; } catch (e) { apiHost = cfg.baseUrl; }
+  console.log("LLM 请求参数:", {
+    format: cfg.format,
+    host: apiHost,
+    model: cfg.model,
+    promptChars: prompt.length,
+    maxTokens,
+    timeoutMs,
+  });
 
-标题：${info.title}
-来源：${info.author}（${info.platform}）
-
-内容：
-${transcript.slice(0, 6000)}
-
-请生成以下格式的笔记（使用 Markdown）：
-
-## 核心要点
-（列出 3-5 个核心要点，每个要点包含标题和 1-2 句详细说明）
-
-## 详细笔记
-（这是最重要的部分。按主题分段，每段要深入展开：
-- 涉及具体方法、策略、步骤的内容，要完整列出，不要省略
-- 技术细节要写清楚原理和操作步骤
-- 数据、案例、对比分析要保留并展开说明
-- 如果有操作流程或方法论，用编号列表逐步展开）
-
-## 金句摘录
-（提取 3-5 句有启发性或有指导意义的原话）
-
-## 总结
-（用 3-5 句话总结核心观点和可执行的行动建议）`;
-
-  let res;
   if (cfg.format === "anthropic") {
-    // Anthropic Messages API 格式
-    const apiHost = new URL(cfg.baseUrl).host;
-    res = await httpsPost(
+    const res = await httpsPost(
       `${cfg.baseUrl}/messages`,
       {
         model: cfg.model,
-        max_tokens: 4096,
-        system: "你是一个专业的笔记助手，擅长生成详细、深入的结构化笔记。",
+        max_tokens: maxTokens,
+        system: "你是一个取舍型笔记编辑，擅长从口播内容中删掉重复和铺垫，提炼短、准、可行动的重点笔记。",
         messages: [{ role: "user", content: prompt }],
       },
       {
         "x-api-key": cfg.apiKey,
         "anthropic-version": "2023-06-01",
-      }
+      },
+      { timeoutMs }
     );
-    const data = JSON.parse(res.body);
+    console.log("LLM 响应:", { status: res.status, durationMs: res.durationMs });
+    if (res.status < 200 || res.status >= 300) {
+      throw new Error("Anthropic API 返回 HTTP " + res.status + ": " + res.body.slice(0, 200));
+    }
+    let data;
+    try { data = JSON.parse(res.body); } catch (e) {
+      throw new Error("Anthropic API 返回格式异常");
+    }
     if (data.error) throw new Error("Anthropic API 错误: " + (data.error.message || JSON.stringify(data.error)));
     if (!data.content || data.content.length === 0) throw new Error("Anthropic 返回了空结果");
     const textBlock = data.content.find(b => b.type === "text");
@@ -706,17 +778,18 @@ ${transcript.slice(0, 6000)}
     return textBlock.text;
   }
 
-  // OpenAI 兼容格式（默认）
-  res = await httpsPost(
+  const res = await httpsPost(
     `${cfg.baseUrl}/chat/completions`,
     {
       model: cfg.model,
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 4096,
-      temperature: 0.7,
+      max_tokens: maxTokens,
+      temperature,
     },
-    { Authorization: `Bearer ${cfg.apiKey}` }
+    { Authorization: `Bearer ${cfg.apiKey}` },
+    { timeoutMs }
   );
+  console.log("LLM 响应:", { status: res.status, durationMs: res.durationMs });
 
   if (res.status !== 200) {
     throw new Error("LLM API 返回 HTTP " + res.status + ": " + res.body.slice(0, 200));
@@ -729,6 +802,139 @@ ${transcript.slice(0, 6000)}
   if (data.error) throw new Error("LLM 错误: " + (data.error.message || JSON.stringify(data.error)));
   if (!data.choices || !data.choices[0] || !data.choices[0].message) throw new Error("LLM 返回了空结果");
   return data.choices[0].message.content;
+}
+
+function buildFullLearningPrompt(transcript, info) {
+  const transcriptText = transcript.trim();
+  const clippedTranscript = transcriptText.slice(0, LLM_TRANSCRIPT_LIMIT);
+  const truncatedNotice = transcriptText.length > clippedTranscript.length
+    ? `\n注意：以下转录文本已截取前 ${clippedTranscript.length} 字，原文约 ${transcriptText.length} 字。不要假装看到了未提供的后半部分；如信息不足，请写“原文未展开”。`
+    : "";
+
+  return `你是一个取舍型笔记编辑。你的目标是让读者在 3 分钟内抓住重点，而不是把转录稿改写成另一版字幕。
+
+请严格遵守：
+- 先筛选再写：只保留最重要、最可复用、最有行动价值的信息。
+- 删除寒暄、铺垫、重复表达、情绪性口播、无信息量例子；不要逐段复述。
+- 每个要点都必须是“结论 + 依据/场景 + 可用动作”，不要写成字幕顺序。
+- 可以基于上下文做合理归纳，但不要编造原文没有的信息；信息不足时写“原文未展开”。
+- 用清晰 Markdown 输出，短句、短段落、少形容词、少空泛套话。
+- 如果原文是碎片化口播，请帮读者重组为可学习的知识结构。
+- 全文控制在 900-1300 字；如果原文很短，宁可更短，不要凑字数。
+
+标题：${info.title}
+来源：${info.author}（${info.platform}）
+${truncatedNotice}
+
+转录文本：
+${clippedTranscript}
+
+请生成以下格式的笔记（使用 Markdown）：
+
+## 一句话结论
+用 1 句话说清楚这个视频最值得记住的判断。
+
+## 核心要点
+列出 3-5 个核心要点。每点最多 80 字，使用这个格式：
+1. **要点标题**：结论 + 依据/场景 + 可用动作。
+
+## 重点展开
+只展开 2-4 个最关键主题。每个主题用 2-3 个短 bullet，不要照转录顺序写：
+- 关键判断是什么
+- 原文给了什么依据、案例、对比或坑点
+- 读者下一次可以怎么判断或使用
+
+如果视频里有流程或方法论，只保留 3-5 步关键动作。
+如果视频里有案例、数据或对比，只保留能支撑核心判断的部分。
+
+## 可迁移方法
+提炼 2-4 条可以迁移到学习、工作、创作或决策中的方法。每条不超过 60 字。
+
+## 行动清单
+给出 3-5 条读者看完后可以立刻执行的动作，每条用动词开头。
+
+## 金句摘录
+提取 0-3 句真正有启发性的原话或高度贴近原文的表达；没有就写“原文未提取到明确金句”。
+
+## 总结
+用 2-3 句话总结：最值得记住的判断是什么，以及下一步应该怎么做。`;
+}
+
+function buildChunkLearningPrompt(transcriptChunk, info, chunkIndex, totalChunks) {
+  return `你是一个取舍型笔记编辑。请从视频转录片段中提炼重点，目标是帮助后续合并成一份短笔记，不要把本段改写成字幕。
+
+标题：${info.title}
+来源：${info.author}（${info.platform}）
+片段：第 ${chunkIndex + 1} / ${totalChunks} 段
+
+转录片段：
+${transcriptChunk.trim()}
+
+要求：
+- 只保留本段最关键的 1-3 个信息点；重复、铺垫、口水话直接忽略。
+- 优先提炼结论、判断标准、方法步骤、案例中的关键证据、风险坑点。
+- 只基于本段内容，不要编造其他片段的信息。
+- 输出要短，整段不超过 350 字；宁缺毋滥，不要为了完整而展开。
+
+请严格按这个 Markdown 结构输出：
+
+### 第 ${chunkIndex + 1} 段：本段主题标题
+
+#### 本段结论
+- **核心观点**：一句话说明本段最值得保留的结论和使用场景。
+
+#### 关键依据
+- 只写 1-2 条支撑结论的案例、数据、对比、判断标准或坑点。
+
+#### 可行动
+- 写 1 条读者可以立刻执行的动作。
+
+#### 金句/原文表达
+如有真正有启发性的原话，最多提取 1 句并使用 > 引用；没有就留空，不要写占位句。`;
+}
+
+async function generateNotes(transcript, info, apiConfig) {
+  const cfg = getLlmConfig(apiConfig);
+  const prompt = buildFullLearningPrompt(transcript, info);
+  return await requestLlmText(prompt, cfg, {
+    maxTokens: LLM_MAX_TOKENS,
+    timeoutMs: LLM_TIMEOUT_MS,
+    temperature: 0.4,
+  });
+}
+
+async function generateNoteChunk(transcriptChunk, info, chunkIndex, totalChunks, apiConfig) {
+  const cfg = getLlmConfig(apiConfig);
+  const prompt = buildChunkLearningPrompt(transcriptChunk, info, chunkIndex, totalChunks);
+  return await requestLlmText(prompt, cfg, {
+    maxTokens: LLM_CHUNK_MAX_TOKENS,
+    timeoutMs: LLM_CHUNK_TIMEOUT_MS,
+    temperature: 0.35,
+  });
+}
+
+async function generateNoteChunkAction(transcriptChunk, info, chunkIndex, totalChunks, apiConfig) {
+  if (!transcriptChunk || typeof transcriptChunk !== "string") {
+    return { success: false, error: "缺少转录片段" };
+  }
+  if (!info || !info.title) {
+    return { success: false, error: "缺少视频信息" };
+  }
+
+  const safeIndex = Number.isFinite(Number(chunkIndex)) ? Number(chunkIndex) : 0;
+  const safeTotal = Number.isFinite(Number(totalChunks)) ? Number(totalChunks) : 1;
+  try {
+    console.log("生成分段笔记:", {
+      chunkIndex: safeIndex,
+      totalChunks: safeTotal,
+      chars: transcriptChunk.length,
+    });
+    const noteContent = await generateNoteChunk(transcriptChunk, info, safeIndex, safeTotal, apiConfig);
+    return { success: true, noteContent };
+  } catch (e) {
+    console.error("分段笔记生成失败:", e.message);
+    return { success: false, error: "分段笔记生成失败: " + e.message };
+  }
 }
 
 // ── 文本笔记生成 ────────────────────────────────────

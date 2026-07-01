@@ -20,7 +20,10 @@
                 data-id="{{item._id}}"
             >
                 <view class="note-item-row">
-                    <text class="star-icon {{item.starred ? 'starred' : ''}}" catchtap="toggleStar" data-id="{{item._id}}" data-starred="{{item.starred}}">{{item.starred ? '★' : '☆'}}</text>
+                    <view class="note-icons">
+                        <text class="read-icon {{item.read ? 'read' : 'unread'}}" catchtap="toggleRead" data-id="{{item._id}}" data-read="{{item.read}}">{{item.read ? '○' : '●'}}</text>
+                        <text class="star-icon {{item.starred ? 'starred' : ''}}" catchtap="toggleStar" data-id="{{item._id}}" data-starred="{{item.starred}}">{{item.starred ? '★' : '☆'}}</text>
+                    </view>
                     <view class="note-item-body">
                         <view class="note-title">{{item.title}}</view>
                         <view class="note-memo" wx:if="{{item._memoSummary}}">📝 {{item._memoSummary}}</view>
@@ -65,7 +68,10 @@
                 data-id="{{note._id}}"
             >
                 <view class="note-item-row">
-                    <text class="star-icon {{note.starred ? 'starred' : ''}}" catchtap="toggleStar" data-id="{{note._id}}" data-starred="{{note.starred}}">{{note.starred ? '★' : '☆'}}</text>
+                    <view class="note-icons">
+                        <text class="read-icon {{note.read ? 'read' : 'unread'}}" catchtap="toggleRead" data-id="{{note._id}}" data-read="{{note.read}}">{{note.read ? '○' : '●'}}</text>
+                        <text class="star-icon {{note.starred ? 'starred' : ''}}" catchtap="toggleStar" data-id="{{note._id}}" data-starred="{{note.starred}}">{{note.starred ? '★' : '☆'}}</text>
+                    </view>
                     <view class="note-item-body">
                         <view class="note-title">{{note.title}}</view>
                         <view class="note-memo" wx:if="{{note._memoSummary}}">📝 {{note._memoSummary}}</view>
